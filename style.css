@@ -429,6 +429,51 @@ header h1 {
 
 .session-actions .btn-primary { flex: 1; }
 
+/* ── Data panel ── */
+.data-panel {
+  margin-top: 32px;
+  padding: 20px;
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+
+.data-panel h3 {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.data-panel-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.data-panel-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.import-label {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--surface2);
+  color: var(--text);
+  transition: background .15s;
+}
+
+.import-label:hover { background: var(--border); }
+.import-label input[type="file"] { display: none; }
+
 /* ── History ── */
 .history-item {
   background: var(--surface);

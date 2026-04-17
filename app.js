@@ -1129,6 +1129,60 @@ document.getElementById('edit-modal-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('edit-modal-overlay')) closeEditModal();
 });
 
+// ── Export / Import ───────────────────────────────────────────────────────────
+
+document.getElementById('export-btn').addEventListener('click', () => {
+  const data = {
+    exportedAt: new Date().toISOString(),
+    version: 1,
+    workouts
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = toLocalDateStr(new Date());
+  a.href = url;
+  a.download = `workouts-backup-${date}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('import-input').addEventListener('change', function () {
+  const file = this.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      const imported = parsed.workouts || parsed; // support both wrapped and raw array
+      if (!Array.isArray(imported)) throw new Error('Invalid format');
+
+      const choice = confirm(
+        `Found ${imported.length} workout(s) in this backup.\n\nOK = Replace all current data\nCancel = Merge with existing data`
+      );
+
+      if (choice) {
+        workouts = imported;
+      } else {
+        // Merge: add workouts not already present (matched by id)
+        const existingIds = new Set(workouts.map(w => w.id));
+        const newOnes = imported.filter(w => !existingIds.has(w.id));
+        workouts = [...workouts, ...newOnes].sort(
+          (a, b) => new Date(b.date) - new Date(a.date)
+        );
+      }
+
+      saveWorkouts(workouts);
+      renderHistory();
+      alert(`Import complete. You now have ${workouts.length} workout(s).`);
+    } catch {
+      alert('Could not read that file. Make sure it\'s a valid workout backup.');
+    }
+    this.value = ''; // reset so same file can be imported again
+  };
+  reader.readAsText(file);
+});
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 renderLogTab();
