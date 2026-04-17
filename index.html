@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workout Tracker</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header>
+      <h1>Workout Tracker</h1>
+      <span id="session-timer" class="hidden"></span>
+    </header>
+
+    <!-- Tab Nav -->
+    <nav class="tab-bar">
+      <button class="tab active" data-tab="log">Log</button>
+      <button class="tab" data-tab="history">History</button>
+      <button class="tab" data-tab="stats">Stats</button>
+    </nav>
+
+    <!-- LOG TAB -->
+    <section id="tab-log" class="tab-content active">
+      <div id="no-session">
+        <p class="hint">No active workout.</p>
+        <button id="start-workout-btn" class="btn-primary big">Start Workout</button>
+      </div>
+
+      <div id="active-session" class="hidden">
+        <div id="exercise-list"></div>
+
+        <button id="add-exercise-btn" class="btn-secondary">+ Add Exercise</button>
+
+        <div class="session-actions">
+          <button id="finish-workout-btn" class="btn-primary">Finish Workout</button>
+          <button id="discard-workout-btn" class="btn-danger">Discard</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORY TAB -->
+    <section id="tab-history" class="tab-content hidden">
+      <div id="history-list">
+        <p class="hint">No workouts logged yet.</p>
+      </div>
+    </section>
+
+    <!-- STATS TAB -->
+    <section id="tab-stats" class="tab-content hidden">
+      <div class="stats-header">
+        <label for="stats-exercise-select">Exercise</label>
+        <select id="stats-exercise-select">
+          <option value="">-- pick an exercise --</option>
+        </select>
+      </div>
+      <div id="stats-content">
+        <p class="hint">Select an exercise to see your progress.</p>
+      </div>
+    </section>
+  </div>
+
+  <!-- ADD EXERCISE MODAL -->
+  <div id="modal-overlay" class="hidden">
+    <div id="modal">
+      <h2>Add Exercise</h2>
+      <label for="exercise-name-input">Exercise name</label>
+      <input id="exercise-name-input" type="text" placeholder="e.g. Bench Press" autocomplete="off" list="exercise-suggestions" />
+      <datalist id="exercise-suggestions"></datalist>
+      <div class="modal-actions">
+        <button id="modal-cancel-btn" class="btn-secondary">Cancel</button>
+        <button id="modal-add-btn" class="btn-primary">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
