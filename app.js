@@ -2,6 +2,7 @@
 
 const STORAGE_KEY = 'wt_workouts';
 const SESSION_KEY = 'wt_session';
+const CUSTOM_EX_KEY = 'wt_custom_exercises';
 
 function loadWorkouts() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
@@ -20,6 +21,19 @@ function loadSession() {
 function saveSession(data) {
   if (data) localStorage.setItem(SESSION_KEY, JSON.stringify(data));
   else localStorage.removeItem(SESSION_KEY);
+}
+
+function loadCustomExercises() {
+  try { return JSON.parse(localStorage.getItem(CUSTOM_EX_KEY)) || []; }
+  catch { return []; }
+}
+
+function saveCustomExercise(name) {
+  const custom = loadCustomExercises();
+  if (!custom.includes(name) && !COMMON_EXERCISES.includes(name)) {
+    custom.push(name);
+    localStorage.setItem(CUSTOM_EX_KEY, JSON.stringify(custom));
+  }
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
@@ -66,18 +80,41 @@ function stopTimer() {
 
 // ── Start / finish / discard session ─────────────────────────────────────────
 
-document.getElementById('start-workout-btn').addEventListener('click', () => {
-  session = { startedAt: new Date().toISOString(), exercises: [] };
-  saveSession(session);
-  renderLogTab();
-  startTimer();
-});
+// ── Workout type picker ───────────────────────────────────────────────────────
 
-document.getElementById('log-past-btn').addEventListener('click', () => {
-  const today = new Date().toISOString().slice(0, 10);
-  session = { startedAt: new Date().toISOString(), manual: true, manualDate: today, exercises: [] };
+let pendingManual = false;
+
+function showTypePicker(manual) {
+  pendingManual = manual;
+  document.getElementById('start-options').classList.add('hidden');
+  document.getElementById('type-picker').classList.remove('hidden');
+}
+
+function hideTypePicker() {
+  document.getElementById('type-picker').classList.add('hidden');
+  document.getElementById('start-options').classList.remove('hidden');
+  pendingManual = false;
+}
+
+function beginSession(type) {
+  if (pendingManual) {
+    const today = new Date().toISOString().slice(0, 10);
+    session = { startedAt: new Date().toISOString(), manual: true, manualDate: today, workoutType: type, exercises: [] };
+  } else {
+    session = { startedAt: new Date().toISOString(), workoutType: type, exercises: [] };
+  }
   saveSession(session);
+  hideTypePicker();
   renderLogTab();
+  if (!session.manual) startTimer();
+}
+
+document.getElementById('start-workout-btn').addEventListener('click', () => showTypePicker(false));
+document.getElementById('log-past-btn').addEventListener('click', () => showTypePicker(true));
+document.getElementById('skip-type-btn').addEventListener('click', () => beginSession(null));
+
+document.querySelectorAll('.type-chip').forEach(btn => {
+  btn.addEventListener('click', () => beginSession(btn.dataset.type));
 });
 
 document.getElementById('finish-workout-btn').addEventListener('click', () => {
@@ -97,18 +134,23 @@ document.getElementById('finish-workout-btn').addEventListener('click', () => {
     return;
   }
 
-  let workoutDate;
+  let workoutDate, duration;
   if (session.manual) {
     const d = document.getElementById('manual-date-input').value;
     workoutDate = d ? new Date(d + 'T12:00:00').toISOString() : new Date().toISOString();
+    const h = parseInt(document.getElementById('manual-hours-input').value) || 0;
+    const m = parseInt(document.getElementById('manual-mins-input').value) || 0;
+    duration = (h * 3600 + m * 60) || null;
   } else {
     workoutDate = new Date().toISOString();
+    duration = Math.floor((Date.now() - new Date(session.startedAt)) / 1000);
   }
 
   const workout = {
     id: Date.now(),
     date: workoutDate,
-    duration: session.manual ? null : Math.floor((Date.now() - new Date(session.startedAt)) / 1000),
+    duration,
+    workoutType: session.workoutType || null,
     exercises: cleaned
   };
   workouts.unshift(workout);
@@ -141,6 +183,12 @@ function renderLogTab() {
 
   noSession.classList.add('hidden');
   activeSession.classList.remove('hidden');
+
+  // Session info bar (type badge)
+  const infoBar = document.getElementById('session-info-bar');
+  infoBar.innerHTML = session.workoutType
+    ? `<span class="session-type-badge type-${session.workoutType.toLowerCase()}">${session.workoutType}</span>`
+    : '';
 
   const dateRow = document.getElementById('manual-date-row');
   const dateInput = document.getElementById('manual-date-input');
@@ -298,7 +346,9 @@ const COMMON_EXERCISES = [
 
 function populateSuggestions() {
   const dl = document.getElementById('exercise-suggestions');
-  COMMON_EXERCISES.forEach(name => {
+  dl.innerHTML = '';
+  const all = [...new Set([...COMMON_EXERCISES, ...loadCustomExercises()])].sort();
+  all.forEach(name => {
     const opt = document.createElement('option');
     opt.value = name;
     dl.appendChild(opt);
@@ -315,6 +365,8 @@ document.getElementById('modal-overlay').addEventListener('click', e => {
 document.getElementById('modal-add-btn').addEventListener('click', () => {
   const name = document.getElementById('exercise-name-input').value.trim();
   if (!name) { document.getElementById('exercise-name-input').focus(); return; }
+  saveCustomExercise(name);
+  populateSuggestions();
   session.exercises.push({ name, sets: [{ reps: '', weight: '', done: false }] });
   saveSession(session);
   closeModal();
@@ -361,11 +413,15 @@ function buildHistoryItem(workout, idx) {
   const exNames = workout.exercises.map(e => e.name).join(', ');
   const totalSets = workout.exercises.reduce((acc, e) => acc + e.sets.length, 0);
 
+  const typeBadge = workout.workoutType
+    ? `<span class="type-badge type-${workout.workoutType.toLowerCase()}">${workout.workoutType}</span>`
+    : '';
+
   const header = document.createElement('div');
   header.className = 'history-item-header';
   header.innerHTML = `
     <div class="history-meta">
-      <span class="history-date">${dateStr}</span>
+      <div class="history-date-row">${typeBadge}<span class="history-date">${dateStr}</span></div>
       <span class="history-summary">${totalSets} sets · ${dur} · ${exNames}</span>
     </div>
     <span class="history-chevron">&#8964;</span>

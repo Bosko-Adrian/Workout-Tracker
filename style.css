@@ -132,6 +132,85 @@ header h1 {
   gap: 12px;
 }
 
+#start-options {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+/* ── Type picker ── */
+#type-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding-top: 8px;
+}
+
+.type-picker-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.type-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.type-chip {
+  padding: 10px 20px;
+  border-radius: 24px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s;
+}
+
+.type-chip:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Workout type colours ── */
+.type-push    { --type-color: #6c63ff; }
+.type-pull    { --type-color: #f5a623; }
+.type-legs    { --type-color: #3ecf8e; }
+.type-upper   { --type-color: #38bdf8; }
+.type-lower   { --type-color: #f472b6; }
+.type-cardio  { --type-color: #f87171; }
+.type-mobility{ --type-color: #a78bfa; }
+
+.session-type-badge, .type-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  background: color-mix(in srgb, var(--type-color) 18%, transparent);
+  color: var(--type-color);
+}
+
+.session-type-badge {
+  margin-bottom: 10px;
+  font-size: 13px;
+  padding: 4px 14px;
+}
+
+.history-date-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 /* ── Manual date row ── */
 #manual-date-row {
   display: flex;
@@ -163,6 +242,27 @@ header h1 {
 }
 
 #manual-date-input:focus { border-color: var(--accent); }
+
+.duration-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.duration-inputs input {
+  width: 64px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 15px;
+  padding: 8px 10px;
+  text-align: center;
+  outline: none;
+}
+
+.duration-inputs input:focus { border-color: var(--accent); }
+.duration-inputs span { color: var(--text-muted); font-weight: 600; font-size: 14px; }
 
 /* ── Exercise card ── */
 .exercise-card {
