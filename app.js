@@ -602,7 +602,145 @@ function getAllExerciseNames() {
   return [...names].sort();
 }
 
+// Returns a Set of date strings 'YYYY-MM-DD' that have a workout
+function getWorkoutDaySet() {
+  const days = new Set();
+  workouts.forEach(w => days.add(w.date.slice(0, 10)));
+  return days;
+}
+
+function computeStreaks(workoutDays) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Current streak: walk back from today
+  let current = 0;
+  const d = new Date(today);
+  // Allow today or yesterday to still count as "active"
+  while (true) {
+    const key = d.toISOString().slice(0, 10);
+    if (workoutDays.has(key)) {
+      current++;
+      d.setDate(d.getDate() - 1);
+    } else {
+      // If today has no workout yet, try from yesterday
+      if (current === 0 && d.getTime() === today.getTime()) {
+        d.setDate(d.getDate() - 1);
+        continue;
+      }
+      break;
+    }
+  }
+
+  // Best streak: scan all days from first workout to today
+  let best = 0, run = 0;
+  if (workoutDays.size > 0) {
+    const allDates = [...workoutDays].sort();
+    const first = new Date(allDates[0]);
+    const cursor = new Date(first);
+    while (cursor <= today) {
+      const key = cursor.toISOString().slice(0, 10);
+      if (workoutDays.has(key)) { run++; best = Math.max(best, run); }
+      else run = 0;
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  }
+
+  return { current, best };
+}
+
+function renderStreak() {
+  const container = document.getElementById('streak-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const workoutDays = getWorkoutDaySet();
+
+  if (workoutDays.size === 0) {
+    container.innerHTML = '<p class="hint" style="padding:16px 0">Log your first workout to start a streak.</p>';
+    return;
+  }
+
+  const { current, best } = computeStreaks(workoutDays);
+
+  // Streak counters
+  const counters = document.createElement('div');
+  counters.className = 'streak-counters';
+  counters.innerHTML = `
+    <div class="streak-card">
+      <div class="streak-value">${current}<span class="streak-flame">🔥</span></div>
+      <div class="streak-label">Current Streak</div>
+    </div>
+    <div class="streak-card">
+      <div class="streak-value">${best}<span class="streak-flame">🏆</span></div>
+      <div class="streak-label">Best Streak</div>
+    </div>
+  `;
+  container.appendChild(counters);
+
+  // 30-day calendar grid
+  const gridWrap = document.createElement('div');
+  gridWrap.className = 'chart-wrap';
+  gridWrap.innerHTML = '<h4>Last 30 Days</h4>';
+
+  const grid = document.createElement('div');
+  grid.className = 'streak-grid';
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Day-of-week headers
+  ['Su','Mo','Tu','We','Th','Fr','Sa'].forEach(d => {
+    const label = document.createElement('div');
+    label.className = 'streak-day-header';
+    label.textContent = d;
+    grid.appendChild(label);
+  });
+
+  // Pad empty cells before the first day
+  const startDate = new Date(today);
+  startDate.setDate(today.getDate() - 29);
+  const firstDow = startDate.getDay(); // 0=Sun
+  for (let i = 0; i < firstDow; i++) {
+    const empty = document.createElement('div');
+    empty.className = 'streak-cell empty';
+    grid.appendChild(empty);
+  }
+
+  // 30 day cells
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(startDate);
+    d.setDate(startDate.getDate() + i);
+    const key = d.toISOString().slice(0, 10);
+    const isToday = d.getTime() === today.getTime();
+    const isFuture = d > today;
+    const hasWorkout = workoutDays.has(key);
+
+    const cell = document.createElement('div');
+    cell.className = 'streak-cell' + (isToday ? ' today' : '');
+    cell.title = key;
+
+    if (isFuture) {
+      cell.classList.add('future');
+      cell.textContent = '';
+    } else if (hasWorkout) {
+      cell.classList.add('hit');
+      cell.textContent = '⭐';
+    } else {
+      cell.classList.add('miss');
+      cell.textContent = '💀';
+    }
+
+    grid.appendChild(cell);
+  }
+
+  gridWrap.appendChild(grid);
+  container.appendChild(gridWrap);
+}
+
 function renderStats() {
+  renderStreak();
+
   const select = document.getElementById('stats-exercise-select');
   const names = getAllExerciseNames();
 

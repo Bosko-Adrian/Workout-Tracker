@@ -501,6 +501,72 @@ header h1 {
 }
 .delete-history-btn:hover { opacity: 1; }
 
+/* ── Streak ── */
+#streak-container { margin-bottom: 20px; }
+
+.streak-counters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.streak-card {
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  padding: 16px 12px;
+  text-align: center;
+}
+
+.streak-value {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1;
+}
+
+.streak-flame { font-size: 24px; margin-left: 4px; }
+
+.streak-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* 30-day grid */
+.streak-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.streak-day-header {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-align: center;
+  padding-bottom: 4px;
+}
+
+.streak-cell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 16px;
+  background: var(--surface2);
+}
+
+.streak-cell.hit  { background: color-mix(in srgb, #f5c518 12%, transparent); }
+.streak-cell.miss { background: color-mix(in srgb, var(--danger) 10%, transparent); opacity: .7; }
+.streak-cell.empty, .streak-cell.future { background: transparent; }
+.streak-cell.today { outline: 2px solid var(--accent); outline-offset: -2px; }
+
 /* ── Stats ── */
 .stats-header {
   display: flex;
