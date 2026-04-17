@@ -39,8 +39,11 @@ function saveCustomExercise(name) {
 // ── State ────────────────────────────────────────────────────────────────────
 
 let workouts = loadWorkouts();
-let session = loadSession(); // { startedAt: ISO, manual?: bool, manualDate?: 'YYYY-MM-DD', exercises: [{name, sets:[{reps,weight,done}]}] }
+let session = loadSession(); // { startedAt: ISO, manual?: bool, manualDate?: 'YYYY-MM-DD', exercises: [{name, sets:[{reps,weight,rest,done}]}] }
 let timerInterval = null;
+
+// restTimers: map of "exIdx-setIdx" -> { startedAt: timestamp, intervalId, restRowEl, nextSetEl }
+const restTimers = {};
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 
@@ -157,6 +160,7 @@ document.getElementById('finish-workout-btn').addEventListener('click', () => {
   saveWorkouts(workouts);
   session = null;
   saveSession(null);
+  clearAllRestTimers();
   stopTimer();
   renderLogTab();
 });
@@ -165,9 +169,15 @@ document.getElementById('discard-workout-btn').addEventListener('click', () => {
   if (!confirm('Discard this workout?')) return;
   session = null;
   saveSession(null);
+  clearAllRestTimers();
   stopTimer();
   renderLogTab();
 });
+
+function clearAllRestTimers() {
+  Object.values(restTimers).forEach(t => clearInterval(t.intervalId));
+  Object.keys(restTimers).forEach(k => delete restTimers[k]);
+}
 
 // ── Log tab renderer ──────────────────────────────────────────────────────────
 
@@ -263,9 +273,16 @@ function buildExerciseCard(ex, exIdx) {
   addSetBtn.textContent = '+ Add Set';
   addSetBtn.addEventListener('click', () => {
     const prev = ex.sets.at(-1);
+    // Stop any running rest timer on the previous set when a new set is added
+    if (prev) {
+      const prevIdx = ex.sets.length - 1;
+      const key = `${exIdx}-${prevIdx}`;
+      if (restTimers[key]) {
+        stopRestTimer(exIdx, prevIdx, tbody.querySelector(`.rest-row:last-of-type`));
+      }
+    }
     ex.sets.push({ reps: prev?.reps || '', weight: prev?.weight || '', done: false });
     saveSession(session);
-    // Append new row instead of full re-render for smoother UX
     tbody.appendChild(buildSetRow(ex.sets.at(-1), exIdx, ex.sets.length - 1));
   });
   footer.appendChild(addSetBtn);
@@ -275,16 +292,17 @@ function buildExerciseCard(ex, exIdx) {
 }
 
 function buildSetRow(set, exIdx, setIdx) {
+  const fragment = document.createDocumentFragment();
+
+  // ── Set row ──
   const tr = document.createElement('tr');
   tr.className = 'sets-row' + (set.done ? ' checked' : '');
 
-  // Set number
   const numTd = document.createElement('td');
   numTd.className = 'set-num';
   numTd.textContent = setIdx + 1;
   tr.appendChild(numTd);
 
-  // Weight input
   const weightTd = document.createElement('td');
   const weightInput = document.createElement('input');
   weightInput.type = 'number';
@@ -298,7 +316,6 @@ function buildSetRow(set, exIdx, setIdx) {
   weightTd.appendChild(weightInput);
   tr.appendChild(weightTd);
 
-  // Reps input
   const repsTd = document.createElement('td');
   const repsInput = document.createElement('input');
   repsInput.type = 'number';
@@ -312,22 +329,101 @@ function buildSetRow(set, exIdx, setIdx) {
   repsTd.appendChild(repsInput);
   tr.appendChild(repsTd);
 
-  // Done checkbox
   const doneTd = document.createElement('td');
   doneTd.className = 'done-cell';
   const checkBtn = document.createElement('button');
   checkBtn.className = 'check-btn' + (set.done ? ' checked' : '');
   checkBtn.setAttribute('aria-label', 'Mark set done');
   checkBtn.addEventListener('click', () => {
-    session.exercises[exIdx].sets[setIdx].done = !session.exercises[exIdx].sets[setIdx].done;
+    const nowDone = !session.exercises[exIdx].sets[setIdx].done;
+    session.exercises[exIdx].sets[setIdx].done = nowDone;
     saveSession(session);
-    checkBtn.classList.toggle('checked');
-    tr.classList.toggle('checked');
+    checkBtn.classList.toggle('checked', nowDone);
+    tr.classList.toggle('checked', nowDone);
+    if (nowDone) {
+      startRestTimer(exIdx, setIdx, restRow);
+    } else {
+      stopRestTimer(exIdx, setIdx, restRow);
+    }
   });
   doneTd.appendChild(checkBtn);
   tr.appendChild(doneTd);
+  fragment.appendChild(tr);
 
-  return tr;
+  // ── Rest row (shown after set is done) ──
+  const restRow = document.createElement('tr');
+  restRow.className = 'rest-row' + (set.done ? '' : ' hidden');
+  restRow.innerHTML = `<td colspan="4"><div class="rest-row-inner">
+    <span class="rest-label">Rest</span>
+    <span class="rest-timer-display" id="rest-display-${exIdx}-${setIdx}"></span>
+    <input class="rest-input" type="number" min="0" placeholder="sec" value="${set.rest || ''}" />
+    <span class="rest-unit">s</span>
+  </div></td>`;
+  const restInput = restRow.querySelector('.rest-input');
+  restInput.addEventListener('change', () => {
+    session.exercises[exIdx].sets[setIdx].rest = parseInt(restInput.value) || null;
+    saveSession(session);
+    // Stop auto-timer if user manually set a value
+    const key = `${exIdx}-${setIdx}`;
+    if (restTimers[key]) stopRestTimer(exIdx, setIdx, restRow);
+  });
+  fragment.appendChild(restRow);
+
+  // Resume timer if session was restored with a done set but no rest recorded yet
+  if (set.done && !set.rest) {
+    startRestTimer(exIdx, setIdx, restRow);
+  } else if (set.done && set.rest) {
+    updateRestDisplay(exIdx, setIdx, set.rest);
+  }
+
+  return fragment;
+}
+
+// ── Rest timer helpers ────────────────────────────────────────────────────────
+
+function startRestTimer(exIdx, setIdx, restRow) {
+  const key = `${exIdx}-${setIdx}`;
+  if (restTimers[key]) return; // already running
+  restRow.classList.remove('hidden');
+  const startedAt = Date.now();
+  const display = document.getElementById(`rest-display-${exIdx}-${setIdx}`);
+  const restInput = restRow.querySelector('.rest-input');
+
+  const intervalId = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+    if (display) display.textContent = formatRestTime(elapsed);
+    // Auto-fill input while timer runs (user can override)
+    if (restInput && !restInput.dataset.manuallySet) {
+      restInput.value = elapsed;
+      session.exercises[exIdx].sets[setIdx].rest = elapsed;
+      saveSession(session);
+    }
+  }, 1000);
+
+  restTimers[key] = { startedAt, intervalId };
+}
+
+function stopRestTimer(exIdx, setIdx, restRow) {
+  const key = `${exIdx}-${setIdx}`;
+  if (restTimers[key]) {
+    clearInterval(restTimers[key].intervalId);
+    delete restTimers[key];
+  }
+  restRow.classList.add('hidden');
+  session.exercises[exIdx].sets[setIdx].rest = null;
+  saveSession(session);
+}
+
+function updateRestDisplay(exIdx, setIdx, secs) {
+  const display = document.getElementById(`rest-display-${exIdx}-${setIdx}`);
+  if (display) display.textContent = formatRestTime(secs);
+}
+
+function formatRestTime(secs) {
+  if (!secs && secs !== 0) return '';
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${s}s`;
 }
 
 // ── Add exercise modal ────────────────────────────────────────────────────────
@@ -450,6 +546,12 @@ function buildHistoryItem(workout, idx) {
       row.className = 'history-set-row';
       row.innerHTML = `<span class="num">Set ${i+1}</span>${s.weight ? s.weight + ' kg' : '—'} &times; ${s.reps || '—'} reps`;
       setsDiv.appendChild(row);
+      if (s.rest && i < ex.sets.length - 1) {
+        const restRow = document.createElement('div');
+        restRow.className = 'history-rest-row';
+        restRow.innerHTML = `<span class="rest-icon">&#8635;</span> ${formatRestTime(s.rest)} rest`;
+        setsDiv.appendChild(restRow);
+      }
     });
     exDiv.appendChild(setsDiv);
     body.appendChild(exDiv);
