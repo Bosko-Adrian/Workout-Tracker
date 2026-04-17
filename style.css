@@ -380,13 +380,6 @@ header h1 {
   min-width: 28px;
 }
 
-.rest-timer-display {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--green);
-  min-width: 36px;
-  font-variant-numeric: tabular-nums;
-}
 
 .rest-input {
   width: 60px;

@@ -42,9 +42,6 @@ let workouts = loadWorkouts();
 let session = loadSession(); // { startedAt: ISO, manual?: bool, manualDate?: 'YYYY-MM-DD', exercises: [{name, sets:[{reps,weight,rest,done}]}] }
 let timerInterval = null;
 
-// restTimers: map of "exIdx-setIdx" -> { startedAt: timestamp, intervalId, restRowEl, nextSetEl }
-const restTimers = {};
-
 // ── Tab switching ─────────────────────────────────────────────────────────────
 
 document.querySelectorAll('.tab').forEach(btn => {
@@ -160,7 +157,6 @@ document.getElementById('finish-workout-btn').addEventListener('click', () => {
   saveWorkouts(workouts);
   session = null;
   saveSession(null);
-  clearAllRestTimers();
   stopTimer();
   renderLogTab();
 });
@@ -169,15 +165,9 @@ document.getElementById('discard-workout-btn').addEventListener('click', () => {
   if (!confirm('Discard this workout?')) return;
   session = null;
   saveSession(null);
-  clearAllRestTimers();
   stopTimer();
   renderLogTab();
 });
-
-function clearAllRestTimers() {
-  Object.values(restTimers).forEach(t => clearInterval(t.intervalId));
-  Object.keys(restTimers).forEach(k => delete restTimers[k]);
-}
 
 // ── Log tab renderer ──────────────────────────────────────────────────────────
 
@@ -274,13 +264,6 @@ function buildExerciseCard(ex, exIdx) {
   addSetBtn.addEventListener('click', () => {
     const prev = ex.sets.at(-1);
     // Stop any running rest timer on the previous set when a new set is added
-    if (prev) {
-      const prevIdx = ex.sets.length - 1;
-      const key = `${exIdx}-${prevIdx}`;
-      if (restTimers[key]) {
-        stopRestTimer(exIdx, prevIdx, tbody.querySelector(`.rest-row:last-of-type`));
-      }
-    }
     ex.sets.push({ reps: prev?.reps || '', weight: prev?.weight || '', done: false });
     saveSession(session);
     tbody.appendChild(buildSetRow(ex.sets.at(-1), exIdx, ex.sets.length - 1));
@@ -340,83 +323,27 @@ function buildSetRow(set, exIdx, setIdx) {
     saveSession(session);
     checkBtn.classList.toggle('checked', nowDone);
     tr.classList.toggle('checked', nowDone);
-    if (nowDone) {
-      startRestTimer(exIdx, setIdx, restRow);
-    } else {
-      stopRestTimer(exIdx, setIdx, restRow);
-    }
+    restRow.classList.toggle('hidden', !nowDone);
   });
   doneTd.appendChild(checkBtn);
   tr.appendChild(doneTd);
   fragment.appendChild(tr);
 
-  // ── Rest row (shown after set is done) ──
+  // ── Rest row (shown after set is checked off) ──
   const restRow = document.createElement('tr');
   restRow.className = 'rest-row' + (set.done ? '' : ' hidden');
   restRow.innerHTML = `<td colspan="4"><div class="rest-row-inner">
     <span class="rest-label">Rest</span>
-    <span class="rest-timer-display" id="rest-display-${exIdx}-${setIdx}"></span>
-    <input class="rest-input" type="number" min="0" placeholder="sec" value="${set.rest || ''}" />
+    <input class="rest-input" type="number" min="0" placeholder="secs" value="${set.rest || ''}" />
     <span class="rest-unit">s</span>
   </div></td>`;
-  const restInput = restRow.querySelector('.rest-input');
-  restInput.addEventListener('change', () => {
-    session.exercises[exIdx].sets[setIdx].rest = parseInt(restInput.value) || null;
+  restRow.querySelector('.rest-input').addEventListener('change', function () {
+    session.exercises[exIdx].sets[setIdx].rest = parseInt(this.value) || null;
     saveSession(session);
-    // Stop auto-timer if user manually set a value
-    const key = `${exIdx}-${setIdx}`;
-    if (restTimers[key]) stopRestTimer(exIdx, setIdx, restRow);
   });
   fragment.appendChild(restRow);
 
-  // Resume timer if session was restored with a done set but no rest recorded yet
-  if (set.done && !set.rest) {
-    startRestTimer(exIdx, setIdx, restRow);
-  } else if (set.done && set.rest) {
-    updateRestDisplay(exIdx, setIdx, set.rest);
-  }
-
   return fragment;
-}
-
-// ── Rest timer helpers ────────────────────────────────────────────────────────
-
-function startRestTimer(exIdx, setIdx, restRow) {
-  const key = `${exIdx}-${setIdx}`;
-  if (restTimers[key]) return; // already running
-  restRow.classList.remove('hidden');
-  const startedAt = Date.now();
-  const display = document.getElementById(`rest-display-${exIdx}-${setIdx}`);
-  const restInput = restRow.querySelector('.rest-input');
-
-  const intervalId = setInterval(() => {
-    const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-    if (display) display.textContent = formatRestTime(elapsed);
-    // Auto-fill input while timer runs (user can override)
-    if (restInput && !restInput.dataset.manuallySet) {
-      restInput.value = elapsed;
-      session.exercises[exIdx].sets[setIdx].rest = elapsed;
-      saveSession(session);
-    }
-  }, 1000);
-
-  restTimers[key] = { startedAt, intervalId };
-}
-
-function stopRestTimer(exIdx, setIdx, restRow) {
-  const key = `${exIdx}-${setIdx}`;
-  if (restTimers[key]) {
-    clearInterval(restTimers[key].intervalId);
-    delete restTimers[key];
-  }
-  restRow.classList.add('hidden');
-  session.exercises[exIdx].sets[setIdx].rest = null;
-  saveSession(session);
-}
-
-function updateRestDisplay(exIdx, setIdx, secs) {
-  const display = document.getElementById(`rest-display-${exIdx}-${setIdx}`);
-  if (display) display.textContent = formatRestTime(secs);
 }
 
 function formatRestTime(secs) {
