@@ -826,7 +826,7 @@ function buildLineChart(title, data, color, unit) {
 
   // Filled area
   const grad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + ch);
-  grad.addColorStop(0, color.replace(')', ', 0.25)').replace('var(--accent)', 'rgba(108,99,255').replace('var(--green)', 'rgba(62,207,142'));
+  grad.addColorStop(0, color.replace(')', ', 0.25)').replace('var(--accent)', 'rgba(56,189,248').replace('var(--green)', 'rgba(62,207,142'));
   grad.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.beginPath();
   ctx.moveTo(toX(0), toY(data[0].y));
@@ -839,7 +839,7 @@ function buildLineChart(title, data, color, unit) {
 
   // Line
   ctx.beginPath();
-  ctx.strokeStyle = color.replace('var(--accent)', '#6c63ff').replace('var(--green)', '#3ecf8e');
+  ctx.strokeStyle = color.replace('var(--accent)', '#38bdf8').replace('var(--green)', '#3ecf8e');
   ctx.lineWidth = 2;
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
@@ -850,9 +850,9 @@ function buildLineChart(title, data, color, unit) {
   data.forEach((d, i) => {
     ctx.beginPath();
     ctx.arc(toX(i), toY(d.y), 4, 0, Math.PI * 2);
-    ctx.fillStyle = color.replace('var(--accent)', '#6c63ff').replace('var(--green)', '#3ecf8e');
+    ctx.fillStyle = color.replace('var(--accent)', '#38bdf8').replace('var(--green)', '#3ecf8e');
     ctx.fill();
-    ctx.strokeStyle = '#1a1a1f';
+    ctx.strokeStyle = '#07090f';
     ctx.lineWidth = 2;
     ctx.stroke();
   });

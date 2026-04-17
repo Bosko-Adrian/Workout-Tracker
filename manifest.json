@@ -4,8 +4,8 @@
   "description": "Track your workouts, sets, reps, and progress.",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#0f0f11",
-  "theme_color": "#0f0f11",
+  "background_color": "#07090f",
+  "theme_color": "#07090f",
   "orientation": "portrait",
   "icons": [
     {
