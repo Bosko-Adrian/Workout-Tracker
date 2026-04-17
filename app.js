@@ -602,10 +602,19 @@ function getAllExerciseNames() {
   return [...names].sort();
 }
 
-// Returns a Set of date strings 'YYYY-MM-DD' that have a workout
+// Local date string 'YYYY-MM-DD' — avoids UTC-offset mismatches
+function toLocalDateStr(d) {
+  const date = d instanceof Date ? d : new Date(d);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// Returns a Set of local date strings 'YYYY-MM-DD' that have a workout
 function getWorkoutDaySet() {
   const days = new Set();
-  workouts.forEach(w => days.add(w.date.slice(0, 10)));
+  workouts.forEach(w => days.add(toLocalDateStr(w.date)));
   return days;
 }
 
@@ -618,7 +627,7 @@ function computeStreaks(workoutDays) {
   const d = new Date(today);
   // Allow today or yesterday to still count as "active"
   while (true) {
-    const key = d.toISOString().slice(0, 10);
+    const key = toLocalDateStr(d);
     if (workoutDays.has(key)) {
       current++;
       d.setDate(d.getDate() - 1);
@@ -639,7 +648,7 @@ function computeStreaks(workoutDays) {
     const first = new Date(allDates[0]);
     const cursor = new Date(first);
     while (cursor <= today) {
-      const key = cursor.toISOString().slice(0, 10);
+      const key = toLocalDateStr(cursor);
       if (workoutDays.has(key)) { run++; best = Math.max(best, run); }
       else run = 0;
       cursor.setDate(cursor.getDate() + 1);
@@ -711,7 +720,7 @@ function renderStreak() {
   for (let i = 0; i < 30; i++) {
     const d = new Date(startDate);
     d.setDate(startDate.getDate() + i);
-    const key = d.toISOString().slice(0, 10);
+    const key = toLocalDateStr(d);
     const isToday = d.getTime() === today.getTime();
     const isFuture = d > today;
     const hasWorkout = workoutDays.has(key);
