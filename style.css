@@ -132,6 +132,38 @@ header h1 {
   gap: 12px;
 }
 
+/* ── Manual date row ── */
+#manual-date-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+
+#manual-date-row label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--text-muted);
+}
+
+#manual-date-input {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 15px;
+  padding: 8px 12px;
+  outline: none;
+  width: 100%;
+}
+
+#manual-date-input:focus { border-color: var(--accent); }
+
 /* ── Exercise card ── */
 .exercise-card {
   background: var(--surface);

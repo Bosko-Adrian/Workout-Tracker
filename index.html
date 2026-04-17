@@ -29,15 +29,21 @@
       <div id="no-session">
         <p class="hint">No active workout.</p>
         <button id="start-workout-btn" class="btn-primary big">Start Workout</button>
+        <button id="log-past-btn" class="btn-secondary big">Log Past Workout</button>
       </div>
 
       <div id="active-session" class="hidden">
+        <div id="manual-date-row" class="hidden">
+          <label for="manual-date-input">Workout date</label>
+          <input id="manual-date-input" type="date" />
+        </div>
+
         <div id="exercise-list"></div>
 
         <button id="add-exercise-btn" class="btn-secondary">+ Add Exercise</button>
 
         <div class="session-actions">
-          <button id="finish-workout-btn" class="btn-primary">Finish Workout</button>
+          <button id="finish-workout-btn" class="btn-primary">Save Workout</button>
           <button id="discard-workout-btn" class="btn-danger">Discard</button>
         </div>
       </div>

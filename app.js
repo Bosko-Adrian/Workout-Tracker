@@ -25,7 +25,7 @@ function saveSession(data) {
 // ── State ────────────────────────────────────────────────────────────────────
 
 let workouts = loadWorkouts();
-let session = loadSession(); // { startedAt: ISO, exercises: [{name, sets:[{reps,weight,done}]}] }
+let session = loadSession(); // { startedAt: ISO, manual?: bool, manualDate?: 'YYYY-MM-DD', exercises: [{name, sets:[{reps,weight,done}]}] }
 let timerInterval = null;
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
@@ -73,6 +73,13 @@ document.getElementById('start-workout-btn').addEventListener('click', () => {
   startTimer();
 });
 
+document.getElementById('log-past-btn').addEventListener('click', () => {
+  const today = new Date().toISOString().slice(0, 10);
+  session = { startedAt: new Date().toISOString(), manual: true, manualDate: today, exercises: [] };
+  saveSession(session);
+  renderLogTab();
+});
+
 document.getElementById('finish-workout-btn').addEventListener('click', () => {
   if (!session) return;
   if (session.exercises.length === 0) {
@@ -90,10 +97,18 @@ document.getElementById('finish-workout-btn').addEventListener('click', () => {
     return;
   }
 
+  let workoutDate;
+  if (session.manual) {
+    const d = document.getElementById('manual-date-input').value;
+    workoutDate = d ? new Date(d + 'T12:00:00').toISOString() : new Date().toISOString();
+  } else {
+    workoutDate = new Date().toISOString();
+  }
+
   const workout = {
     id: Date.now(),
-    date: new Date().toISOString(),
-    duration: Math.floor((Date.now() - new Date(session.startedAt)) / 1000),
+    date: workoutDate,
+    duration: session.manual ? null : Math.floor((Date.now() - new Date(session.startedAt)) / 1000),
     exercises: cleaned
   };
   workouts.unshift(workout);
@@ -126,6 +141,25 @@ function renderLogTab() {
 
   noSession.classList.add('hidden');
   activeSession.classList.remove('hidden');
+
+  const dateRow = document.getElementById('manual-date-row');
+  const dateInput = document.getElementById('manual-date-input');
+  const finishBtn = document.getElementById('finish-workout-btn');
+
+  if (session.manual) {
+    dateRow.classList.remove('hidden');
+    dateInput.value = session.manualDate || new Date().toISOString().slice(0, 10);
+    dateInput.max = new Date().toISOString().slice(0, 10);
+    dateInput.addEventListener('change', () => {
+      session.manualDate = dateInput.value;
+      saveSession(session);
+    });
+    finishBtn.textContent = 'Save Workout';
+  } else {
+    dateRow.classList.add('hidden');
+    finishBtn.textContent = 'Finish Workout';
+  }
+
   renderExerciseList();
 }
 
