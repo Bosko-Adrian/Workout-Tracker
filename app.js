@@ -367,10 +367,17 @@ document.getElementById('modal-add-btn').addEventListener('click', () => {
   if (!name) { document.getElementById('exercise-name-input').focus(); return; }
   saveCustomExercise(name);
   populateSuggestions();
-  session.exercises.push({ name, sets: [{ reps: '', weight: '', done: false }] });
-  saveSession(session);
-  closeModal();
-  renderExerciseList();
+  if (editAddingExercise) {
+    editExercises.push({ name, sets: [{ reps: '', weight: '' }] });
+    closeModal();
+    renderEditExerciseList();
+    editAddingExercise = false;
+  } else {
+    session.exercises.push({ name, sets: [{ reps: '', weight: '', done: false }] });
+    saveSession(session);
+    closeModal();
+    renderExerciseList();
+  }
 });
 
 document.getElementById('exercise-name-input').addEventListener('keydown', e => {
@@ -448,16 +455,28 @@ function buildHistoryItem(workout, idx) {
     body.appendChild(exDiv);
   });
 
+  const bodyActions = document.createElement('div');
+  bodyActions.className = 'history-body-actions';
+
+  const editBtn = document.createElement('button');
+  editBtn.className = 'btn-secondary';
+  editBtn.style.fontSize = '13px';
+  editBtn.textContent = 'Edit';
+  editBtn.addEventListener('click', () => openEditModal(idx));
+
   const delBtn = document.createElement('button');
   delBtn.className = 'delete-history-btn';
-  delBtn.textContent = 'Delete this workout';
+  delBtn.textContent = 'Delete';
   delBtn.addEventListener('click', () => {
     if (!confirm('Delete this workout?')) return;
     workouts.splice(idx, 1);
     saveWorkouts(workouts);
     renderHistory();
   });
-  body.appendChild(delBtn);
+
+  bodyActions.appendChild(editBtn);
+  bodyActions.appendChild(delBtn);
+  body.appendChild(bodyActions);
   item.appendChild(body);
 
   return item;
@@ -664,6 +683,202 @@ function buildLineChart(title, data, color, unit) {
 
   return wrap;
 }
+
+// ── Edit workout modal ────────────────────────────────────────────────────────
+
+let editingIdx = null;
+let editExercises = [];
+let editSelectedType = null;
+
+function openEditModal(idx) {
+  const workout = workouts[idx];
+  editingIdx = idx;
+  editExercises = JSON.parse(JSON.stringify(workout.exercises)); // deep copy
+  editSelectedType = workout.workoutType || null;
+
+  // Date
+  const dateInput = document.getElementById('edit-date-input');
+  dateInput.value = new Date(workout.date).toISOString().slice(0, 10);
+  dateInput.max = new Date().toISOString().slice(0, 10);
+
+  // Duration
+  const secs = workout.duration || 0;
+  document.getElementById('edit-hours-input').value = secs ? Math.floor(secs / 3600) || '' : '';
+  document.getElementById('edit-mins-input').value = secs ? Math.floor((secs % 3600) / 60) || '' : '';
+
+  // Type chips
+  refreshEditTypeChips();
+
+  // Exercises
+  renderEditExerciseList();
+
+  document.getElementById('edit-modal-overlay').classList.remove('hidden');
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal-overlay').classList.add('hidden');
+  editingIdx = null;
+  editExercises = [];
+  editSelectedType = null;
+}
+
+function refreshEditTypeChips() {
+  document.querySelectorAll('.edit-type-chip').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.type === editSelectedType);
+  });
+}
+
+document.querySelectorAll('.edit-type-chip').forEach(btn => {
+  btn.addEventListener('click', () => {
+    editSelectedType = editSelectedType === btn.dataset.type ? null : btn.dataset.type;
+    refreshEditTypeChips();
+  });
+});
+
+function renderEditExerciseList() {
+  const container = document.getElementById('edit-exercise-list');
+  container.innerHTML = '';
+  editExercises.forEach((ex, exIdx) => {
+    container.appendChild(buildEditExerciseCard(ex, exIdx));
+  });
+}
+
+function buildEditExerciseCard(ex, exIdx) {
+  const card = document.createElement('div');
+  card.className = 'exercise-card';
+
+  const header = document.createElement('div');
+  header.className = 'exercise-card-header';
+  const title = document.createElement('h3');
+  title.textContent = ex.name;
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'btn-ghost';
+  removeBtn.textContent = 'Remove';
+  removeBtn.addEventListener('click', () => {
+    editExercises.splice(exIdx, 1);
+    renderEditExerciseList();
+  });
+  header.appendChild(title);
+  header.appendChild(removeBtn);
+  card.appendChild(header);
+
+  const table = document.createElement('table');
+  table.className = 'sets-table';
+  table.innerHTML = `<thead><tr><th>Set</th><th>Weight (kg)</th><th>Reps</th><th></th></tr></thead>`;
+  const tbody = document.createElement('tbody');
+
+  ex.sets.forEach((set, setIdx) => {
+    tbody.appendChild(buildEditSetRow(ex, exIdx, set, setIdx, tbody));
+  });
+  table.appendChild(tbody);
+  card.appendChild(table);
+
+  const footer = document.createElement('div');
+  footer.className = 'exercise-card-footer';
+  const addSetBtn = document.createElement('button');
+  addSetBtn.className = 'btn-secondary';
+  addSetBtn.textContent = '+ Add Set';
+  addSetBtn.addEventListener('click', () => {
+    const prev = ex.sets.at(-1);
+    ex.sets.push({ reps: prev?.reps || '', weight: prev?.weight || '' });
+    tbody.appendChild(buildEditSetRow(ex, exIdx, ex.sets.at(-1), ex.sets.length - 1, tbody));
+  });
+  footer.appendChild(addSetBtn);
+  card.appendChild(footer);
+
+  return card;
+}
+
+function buildEditSetRow(ex, exIdx, set, setIdx, tbody) {
+  const tr = document.createElement('tr');
+  tr.className = 'sets-row';
+
+  const numTd = document.createElement('td');
+  numTd.className = 'set-num';
+  numTd.textContent = setIdx + 1;
+  tr.appendChild(numTd);
+
+  const weightTd = document.createElement('td');
+  const weightInput = document.createElement('input');
+  weightInput.type = 'number';
+  weightInput.min = '0';
+  weightInput.placeholder = '—';
+  weightInput.value = set.weight || '';
+  weightInput.addEventListener('change', () => { set.weight = weightInput.value; });
+  weightTd.appendChild(weightInput);
+  tr.appendChild(weightTd);
+
+  const repsTd = document.createElement('td');
+  const repsInput = document.createElement('input');
+  repsInput.type = 'number';
+  repsInput.min = '0';
+  repsInput.placeholder = '—';
+  repsInput.value = set.reps || '';
+  repsInput.addEventListener('change', () => { set.reps = repsInput.value; });
+  repsTd.appendChild(repsInput);
+  tr.appendChild(repsTd);
+
+  const delTd = document.createElement('td');
+  delTd.className = 'done-cell';
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn-ghost';
+  delBtn.style.fontSize = '16px';
+  delBtn.textContent = '✕';
+  delBtn.addEventListener('click', () => {
+    ex.sets.splice(setIdx, 1);
+    // Re-render the whole exercise card to fix set numbers
+    renderEditExerciseList();
+  });
+  delTd.appendChild(delBtn);
+  tr.appendChild(delTd);
+
+  return tr;
+}
+
+// Add exercise to edit modal (reuses the existing exercise name modal)
+let editAddingExercise = false;
+
+document.getElementById('edit-add-exercise-btn').addEventListener('click', () => {
+  editAddingExercise = true;
+  openModal();
+});
+
+// Reset flag when modal is cancelled
+document.getElementById('modal-cancel-btn').addEventListener('click', () => { editAddingExercise = false; });
+
+// Save edit
+document.getElementById('edit-save-btn').addEventListener('click', () => {
+  if (editingIdx === null) return;
+
+  const d = document.getElementById('edit-date-input').value;
+  const date = d ? new Date(d + 'T12:00:00').toISOString() : workouts[editingIdx].date;
+
+  const h = parseInt(document.getElementById('edit-hours-input').value) || 0;
+  const m = parseInt(document.getElementById('edit-mins-input').value) || 0;
+  const duration = (h * 3600 + m * 60) || null;
+
+  const cleaned = editExercises
+    .map(ex => ({ name: ex.name, sets: ex.sets.filter(s => s.reps || s.weight) }))
+    .filter(ex => ex.sets.length > 0);
+
+  workouts[editingIdx] = {
+    ...workouts[editingIdx],
+    date,
+    duration,
+    workoutType: editSelectedType,
+    exercises: cleaned.length > 0 ? cleaned : workouts[editingIdx].exercises
+  };
+
+  saveWorkouts(workouts);
+  closeEditModal();
+  renderHistory();
+});
+
+document.getElementById('edit-cancel-btn').addEventListener('click', closeEditModal);
+document.getElementById('edit-modal-close-btn').addEventListener('click', closeEditModal);
+document.getElementById('edit-modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('edit-modal-overlay')) closeEditModal();
+});
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 

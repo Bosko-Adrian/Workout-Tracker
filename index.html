@@ -92,6 +92,53 @@
     </section>
   </div>
 
+  <!-- EDIT WORKOUT MODAL -->
+  <div id="edit-modal-overlay" class="hidden">
+    <div id="edit-modal">
+      <div class="edit-modal-header">
+        <h2>Edit Workout</h2>
+        <button id="edit-modal-close-btn" class="btn-ghost">✕</button>
+      </div>
+
+      <div class="edit-section">
+        <label for="edit-date-input">Date</label>
+        <input id="edit-date-input" type="date" />
+      </div>
+
+      <div class="edit-section">
+        <label>Session type</label>
+        <div class="type-chips edit-type-chips">
+          <button class="type-chip edit-type-chip" data-type="Push">Push</button>
+          <button class="type-chip edit-type-chip" data-type="Pull">Pull</button>
+          <button class="type-chip edit-type-chip" data-type="Legs">Legs</button>
+          <button class="type-chip edit-type-chip" data-type="Upper">Upper</button>
+          <button class="type-chip edit-type-chip" data-type="Lower">Lower</button>
+          <button class="type-chip edit-type-chip" data-type="Cardio">Cardio</button>
+          <button class="type-chip edit-type-chip" data-type="Mobility">Mobility</button>
+        </div>
+      </div>
+
+      <div class="edit-section">
+        <label>Duration (optional)</label>
+        <div class="duration-inputs">
+          <input id="edit-hours-input" type="number" min="0" max="23" placeholder="0" /> <span>h</span>
+          <input id="edit-mins-input" type="number" min="0" max="59" placeholder="0" /> <span>m</span>
+        </div>
+      </div>
+
+      <div class="edit-section">
+        <label>Exercises</label>
+        <div id="edit-exercise-list"></div>
+        <button id="edit-add-exercise-btn" class="btn-secondary" style="width:100%;margin-top:8px">+ Add Exercise</button>
+      </div>
+
+      <div class="modal-actions">
+        <button id="edit-cancel-btn" class="btn-secondary">Cancel</button>
+        <button id="edit-save-btn" class="btn-primary">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ADD EXERCISE MODAL -->
   <div id="modal-overlay" class="hidden">
     <div id="modal">
