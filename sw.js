@@ -1,5 +1,5 @@
 // Bump this version number any time you want the phone to pick up new changes.
-const VERSION = 'v7';
+const VERSION = 'v8';
 const CACHE = 'workout-tracker-' + VERSION;
 
 const ASSETS = [
