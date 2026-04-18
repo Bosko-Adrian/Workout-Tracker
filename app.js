@@ -3,6 +3,7 @@
 const STORAGE_KEY = 'wt_workouts';
 const SESSION_KEY = 'wt_session';
 const CUSTOM_EX_KEY = 'wt_custom_exercises';
+const TEMPLATES_KEY = 'wt_templates';
 
 function loadWorkouts() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
@@ -36,11 +37,24 @@ function saveCustomExercise(name) {
   }
 }
 
+function loadTemplates() {
+  try { return JSON.parse(localStorage.getItem(TEMPLATES_KEY)) || []; }
+  catch { return []; }
+}
+
+function saveTemplates(data) {
+  localStorage.setItem(TEMPLATES_KEY, JSON.stringify(data));
+}
+
 // ── State ────────────────────────────────────────────────────────────────────
 
 let workouts = loadWorkouts();
 let session = loadSession(); // { startedAt: ISO, manual?: bool, manualDate?: 'YYYY-MM-DD', exercises: [{name, sets:[{reps,weight,rest,done}]}] }
+let templates = loadTemplates();
 let timerInterval = null;
+
+// Active rest timers: "exIdx-setIdx" -> { intervalId, startedAt, displayEl, inputEl }
+const activeRestTimers = {};
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 
@@ -52,6 +66,7 @@ document.querySelectorAll('.tab').forEach(btn => {
     document.getElementById('tab-' + btn.dataset.tab).classList.remove('hidden');
     if (btn.dataset.tab === 'history') renderHistory();
     if (btn.dataset.tab === 'stats') renderStats();
+    if (btn.dataset.tab === 'plans') renderPlansTab();
   });
 });
 
@@ -83,37 +98,66 @@ function stopTimer() {
 // ── Workout type picker ───────────────────────────────────────────────────────
 
 let pendingManual = false;
+let pendingTemplateExercises = null; // exercises pre-loaded from a template
+
+function showStep(stepId) {
+  ['start-options','template-picker-step','type-picker'].forEach(id => {
+    document.getElementById(id).classList.add('hidden');
+  });
+  document.getElementById(stepId).classList.remove('hidden');
+}
 
 function showTypePicker(manual) {
   pendingManual = manual;
-  document.getElementById('start-options').classList.add('hidden');
-  document.getElementById('type-picker').classList.remove('hidden');
+  showStep('type-picker');
 }
 
-function hideTypePicker() {
-  document.getElementById('type-picker').classList.add('hidden');
-  document.getElementById('start-options').classList.remove('hidden');
-  pendingManual = false;
+function showTemplatePicker() {
+  const list = document.getElementById('template-picker-list');
+  list.innerHTML = '';
+  if (templates.length === 0) {
+    list.innerHTML = '<p class="hint" style="padding:12px 0">No templates yet — create one in the Plans tab.</p>';
+  } else {
+    templates.forEach(t => {
+      const btn = document.createElement('button');
+      btn.className = 'template-picker-item';
+      btn.innerHTML = `<span class="tpi-name">${t.name}</span><span class="tpi-meta">${t.exercises.length} exercise${t.exercises.length !== 1 ? 's' : ''}</span>`;
+      btn.addEventListener('click', () => {
+        pendingTemplateExercises = t.exercises.map(ex => ({
+          name: ex.name,
+          sets: ex.sets.map(s => ({ weight: s.weight || '', reps: s.reps || '', done: false }))
+        }));
+        showTypePicker(false);
+      });
+      list.appendChild(btn);
+    });
+  }
+  showStep('template-picker-step');
 }
 
 function beginSession(type) {
+  const exercises = pendingTemplateExercises || [];
   if (pendingManual) {
-    const today = new Date().toISOString().slice(0, 10);
-    session = { startedAt: new Date().toISOString(), manual: true, manualDate: today, workoutType: type, exercises: [] };
+    const today = toLocalDateStr(new Date());
+    session = { startedAt: new Date().toISOString(), manual: true, manualDate: today, workoutType: type, exercises };
   } else {
-    session = { startedAt: new Date().toISOString(), workoutType: type, exercises: [] };
+    session = { startedAt: new Date().toISOString(), workoutType: type, exercises };
   }
+  pendingTemplateExercises = null;
   saveSession(session);
-  hideTypePicker();
+  showStep('start-options'); // reset for next time
   renderLogTab();
   if (!session.manual) startTimer();
 }
 
 document.getElementById('start-workout-btn').addEventListener('click', () => showTypePicker(false));
 document.getElementById('log-past-btn').addEventListener('click', () => showTypePicker(true));
+document.getElementById('use-template-btn').addEventListener('click', showTemplatePicker);
+document.getElementById('template-picker-back-btn').addEventListener('click', () => showStep('start-options'));
 document.getElementById('skip-type-btn').addEventListener('click', () => beginSession(null));
 
-document.querySelectorAll('.type-chip').forEach(btn => {
+// Only wire type-chips in the log tab's type-picker (not edit modal chips)
+document.querySelectorAll('#type-picker .type-chip').forEach(btn => {
   btn.addEventListener('click', () => beginSession(btn.dataset.type));
 });
 
@@ -157,6 +201,7 @@ document.getElementById('finish-workout-btn').addEventListener('click', () => {
   saveWorkouts(workouts);
   session = null;
   saveSession(null);
+  Object.keys(activeRestTimers).forEach(k => { clearInterval(activeRestTimers[k].intervalId); delete activeRestTimers[k]; });
   stopTimer();
   renderLogTab();
 });
@@ -165,6 +210,7 @@ document.getElementById('discard-workout-btn').addEventListener('click', () => {
   if (!confirm('Discard this workout?')) return;
   session = null;
   saveSession(null);
+  Object.keys(activeRestTimers).forEach(k => { clearInterval(activeRestTimers[k].intervalId); delete activeRestTimers[k]; });
   stopTimer();
   renderLogTab();
 });
@@ -324,6 +370,8 @@ function buildSetRow(set, exIdx, setIdx) {
     checkBtn.classList.toggle('checked', nowDone);
     tr.classList.toggle('checked', nowDone);
     restRow.classList.toggle('hidden', !nowDone);
+    // Stop timer if unchecking
+    if (!nowDone) stopRestTimer(exIdx, setIdx);
   });
   doneTd.appendChild(checkBtn);
   tr.appendChild(doneTd);
@@ -332,18 +380,95 @@ function buildSetRow(set, exIdx, setIdx) {
   // ── Rest row (shown after set is checked off) ──
   const restRow = document.createElement('tr');
   restRow.className = 'rest-row' + (set.done ? '' : ' hidden');
-  restRow.innerHTML = `<td colspan="4"><div class="rest-row-inner">
-    <span class="rest-label">Rest</span>
-    <input class="rest-input" type="number" min="0" placeholder="secs" value="${set.rest || ''}" />
-    <span class="rest-unit">s</span>
-  </div></td>`;
-  restRow.querySelector('.rest-input').addEventListener('change', function () {
+
+  const restTd = document.createElement('td');
+  restTd.colSpan = 4;
+  const restInner = document.createElement('div');
+  restInner.className = 'rest-row-inner';
+
+  const restLabel = document.createElement('span');
+  restLabel.className = 'rest-label';
+  restLabel.textContent = 'Rest';
+
+  const timerBtn = document.createElement('button');
+  timerBtn.className = 'rest-timer-btn';
+  timerBtn.textContent = '▶ Start';
+
+  const restDisplay = document.createElement('span');
+  restDisplay.className = 'rest-timer-display';
+  restDisplay.textContent = set.rest ? formatRestTime(set.rest) : '';
+
+  const restInput = document.createElement('input');
+  restInput.className = 'rest-input';
+  restInput.type = 'number';
+  restInput.min = '0';
+  restInput.placeholder = 'secs';
+  restInput.value = set.rest || '';
+
+  const restUnit = document.createElement('span');
+  restUnit.className = 'rest-unit';
+  restUnit.textContent = 's';
+
+  restInput.addEventListener('change', function () {
     session.exercises[exIdx].sets[setIdx].rest = parseInt(this.value) || null;
+    restDisplay.textContent = this.value ? formatRestTime(parseInt(this.value)) : '';
     saveSession(session);
+    stopRestTimer(exIdx, setIdx);
   });
+
+  timerBtn.addEventListener('click', () => {
+    const key = `${exIdx}-${setIdx}`;
+    if (activeRestTimers[key]) {
+      // Stop and save
+      const elapsed = Math.floor((Date.now() - activeRestTimers[key].startedAt) / 1000);
+      stopRestTimer(exIdx, setIdx);
+      restInput.value = elapsed;
+      session.exercises[exIdx].sets[setIdx].rest = elapsed;
+      restDisplay.textContent = formatRestTime(elapsed);
+      saveSession(session);
+      timerBtn.textContent = '▶ Start';
+      timerBtn.classList.remove('running');
+    } else {
+      // Start
+      startRestTimer(exIdx, setIdx, timerBtn, restDisplay);
+    }
+  });
+
+  restInner.appendChild(restLabel);
+  restInner.appendChild(timerBtn);
+  restInner.appendChild(restDisplay);
+  restInner.appendChild(restInput);
+  restInner.appendChild(restUnit);
+  restTd.appendChild(restInner);
+  restRow.appendChild(restTd);
   fragment.appendChild(restRow);
 
   return fragment;
+}
+
+// ── Rest timer helpers ────────────────────────────────────────────────────────
+
+function startRestTimer(exIdx, setIdx, timerBtn, displayEl) {
+  const key = `${exIdx}-${setIdx}`;
+  if (activeRestTimers[key]) return;
+  const startedAt = Date.now();
+  timerBtn.textContent = '⏹ 0s';
+  timerBtn.classList.add('running');
+  const intervalId = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+    const label = formatRestTime(elapsed);
+    timerBtn.textContent = `⏹ ${label}`;
+    if (displayEl) displayEl.textContent = '';
+  }, 1000);
+  activeRestTimers[key] = { intervalId, startedAt };
+}
+
+function stopRestTimer(exIdx, setIdx) {
+  const key = `${exIdx}-${setIdx}`;
+  if (activeRestTimers[key]) {
+    clearInterval(activeRestTimers[key].intervalId);
+    delete activeRestTimers[key];
+  }
 }
 
 function formatRestTime(secs) {
@@ -390,7 +515,12 @@ document.getElementById('modal-add-btn').addEventListener('click', () => {
   if (!name) { document.getElementById('exercise-name-input').focus(); return; }
   saveCustomExercise(name);
   populateSuggestions();
-  if (editAddingExercise) {
+  if (templateAddingExercise) {
+    templateEditExercises.push({ name, sets: [{ reps: '', weight: '' }] });
+    closeModal();
+    renderTemplateExerciseList();
+    templateAddingExercise = false;
+  } else if (editAddingExercise) {
     editExercises.push({ name, sets: [{ reps: '', weight: '' }] });
     closeModal();
     renderEditExerciseList();
@@ -416,6 +546,192 @@ function openModal() {
 function closeModal() {
   document.getElementById('modal-overlay').classList.add('hidden');
 }
+
+// ── Plans tab ────────────────────────────────────────────────────────────────
+
+let templateAddingExercise = false;
+let templateEditExercises = [];
+let editingTemplateIdx = null;
+
+function renderPlansTab() {
+  const list = document.getElementById('templates-list');
+  list.innerHTML = '';
+  if (templates.length === 0) {
+    list.innerHTML = '<p class="hint">No templates yet. Create one to pre-plan your workouts.</p>';
+    return;
+  }
+  templates.forEach((t, idx) => {
+    const card = document.createElement('div');
+    card.className = 'template-card';
+    const exNames = t.exercises.map(e => e.name).join(', ');
+    const totalSets = t.exercises.reduce((acc, e) => acc + e.sets.length, 0);
+    card.innerHTML = `
+      <div class="template-card-info">
+        <div class="template-card-name">${t.name}</div>
+        <div class="template-card-meta">${t.exercises.length} exercise${t.exercises.length !== 1 ? 's' : ''} · ${totalSets} sets · ${exNames}</div>
+      </div>
+      <div class="template-card-actions"></div>
+    `;
+    const actions = card.querySelector('.template-card-actions');
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn-secondary';
+    editBtn.style.fontSize = '13px';
+    editBtn.textContent = 'Edit';
+    editBtn.addEventListener('click', () => openTemplateEditor(idx));
+    const delBtn = document.createElement('button');
+    delBtn.className = 'delete-history-btn';
+    delBtn.textContent = 'Delete';
+    delBtn.addEventListener('click', () => {
+      if (!confirm(`Delete "${t.name}"?`)) return;
+      templates.splice(idx, 1);
+      saveTemplates(templates);
+      renderPlansTab();
+    });
+    actions.appendChild(editBtn);
+    actions.appendChild(delBtn);
+    list.appendChild(card);
+  });
+}
+
+document.getElementById('new-template-btn').addEventListener('click', () => openTemplateEditor(null));
+
+function openTemplateEditor(idx) {
+  editingTemplateIdx = idx;
+  const t = idx !== null ? templates[idx] : null;
+  templateEditExercises = t ? JSON.parse(JSON.stringify(t.exercises)) : [];
+  document.getElementById('template-modal-title').textContent = t ? 'Edit Template' : 'New Template';
+  document.getElementById('template-name-input').value = t ? t.name : '';
+  renderTemplateExerciseList();
+  document.getElementById('template-modal-overlay').classList.remove('hidden');
+}
+
+function closeTemplateEditor() {
+  document.getElementById('template-modal-overlay').classList.add('hidden');
+  editingTemplateIdx = null;
+  templateEditExercises = [];
+}
+
+function renderTemplateExerciseList() {
+  const container = document.getElementById('template-exercise-list');
+  container.innerHTML = '';
+  templateEditExercises.forEach((ex, exIdx) => {
+    container.appendChild(buildTemplateExerciseCard(ex, exIdx));
+  });
+}
+
+function buildTemplateExerciseCard(ex, exIdx) {
+  const card = document.createElement('div');
+  card.className = 'exercise-card';
+
+  const header = document.createElement('div');
+  header.className = 'exercise-card-header';
+  const title = document.createElement('h3');
+  title.textContent = ex.name;
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'btn-ghost';
+  removeBtn.textContent = 'Remove';
+  removeBtn.addEventListener('click', () => {
+    templateEditExercises.splice(exIdx, 1);
+    renderTemplateExerciseList();
+  });
+  header.appendChild(title);
+  header.appendChild(removeBtn);
+  card.appendChild(header);
+
+  const table = document.createElement('table');
+  table.className = 'sets-table';
+  table.innerHTML = `<thead><tr><th>Set</th><th>Weight (kg)</th><th>Reps</th><th></th></tr></thead>`;
+  const tbody = document.createElement('tbody');
+
+  ex.sets.forEach((set, setIdx) => {
+    tbody.appendChild(buildTemplateSetRow(ex, exIdx, set, setIdx, tbody));
+  });
+  table.appendChild(tbody);
+  card.appendChild(table);
+
+  const footer = document.createElement('div');
+  footer.className = 'exercise-card-footer';
+  const addSetBtn = document.createElement('button');
+  addSetBtn.className = 'btn-secondary';
+  addSetBtn.textContent = '+ Add Set';
+  addSetBtn.addEventListener('click', () => {
+    const prev = ex.sets.at(-1);
+    ex.sets.push({ weight: prev?.weight || '', reps: prev?.reps || '' });
+    tbody.appendChild(buildTemplateSetRow(ex, exIdx, ex.sets.at(-1), ex.sets.length - 1, tbody));
+  });
+  footer.appendChild(addSetBtn);
+  card.appendChild(footer);
+  return card;
+}
+
+function buildTemplateSetRow(ex, exIdx, set, setIdx, tbody) {
+  const tr = document.createElement('tr');
+  tr.className = 'sets-row';
+
+  const numTd = document.createElement('td');
+  numTd.className = 'set-num';
+  numTd.textContent = setIdx + 1;
+  tr.appendChild(numTd);
+
+  const weightTd = document.createElement('td');
+  const weightInput = document.createElement('input');
+  weightInput.type = 'number'; weightInput.min = '0'; weightInput.placeholder = '—';
+  weightInput.value = set.weight || '';
+  weightInput.addEventListener('change', () => { set.weight = weightInput.value; });
+  weightTd.appendChild(weightInput);
+  tr.appendChild(weightTd);
+
+  const repsTd = document.createElement('td');
+  const repsInput = document.createElement('input');
+  repsInput.type = 'number'; repsInput.min = '0'; repsInput.placeholder = '—';
+  repsInput.value = set.reps || '';
+  repsInput.addEventListener('change', () => { set.reps = repsInput.value; });
+  repsTd.appendChild(repsInput);
+  tr.appendChild(repsTd);
+
+  const delTd = document.createElement('td');
+  delTd.className = 'done-cell';
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn-ghost';
+  delBtn.style.fontSize = '16px';
+  delBtn.textContent = '✕';
+  delBtn.addEventListener('click', () => {
+    ex.sets.splice(setIdx, 1);
+    renderTemplateExerciseList();
+  });
+  delTd.appendChild(delBtn);
+  tr.appendChild(delTd);
+
+  return tr;
+}
+
+document.getElementById('template-add-exercise-btn').addEventListener('click', () => {
+  templateAddingExercise = true;
+  openModal();
+});
+
+document.getElementById('template-save-btn').addEventListener('click', () => {
+  const name = document.getElementById('template-name-input').value.trim();
+  if (!name) { document.getElementById('template-name-input').focus(); return; }
+  const cleaned = templateEditExercises
+    .map(ex => ({ name: ex.name, sets: ex.sets.filter(s => s.reps || s.weight) }))
+    .filter(ex => ex.sets.length > 0);
+  const t = { id: editingTemplateIdx !== null ? templates[editingTemplateIdx].id : Date.now(), name, exercises: cleaned };
+  if (editingTemplateIdx !== null) templates[editingTemplateIdx] = t;
+  else templates.push(t);
+  saveTemplates(templates);
+  closeTemplateEditor();
+  renderPlansTab();
+});
+
+document.getElementById('template-cancel-btn').addEventListener('click', closeTemplateEditor);
+document.getElementById('template-modal-close-btn').addEventListener('click', closeTemplateEditor);
+document.getElementById('template-modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('template-modal-overlay')) closeTemplateEditor();
+});
+
+// Reset templateAddingExercise when modal cancelled
+document.getElementById('modal-cancel-btn').addEventListener('click', () => { templateAddingExercise = false; });
 
 // ── History tab ───────────────────────────────────────────────────────────────
 

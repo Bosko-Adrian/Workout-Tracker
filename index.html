@@ -20,6 +20,7 @@
     <!-- Tab Nav -->
     <nav class="tab-bar">
       <button class="tab active" data-tab="log">Log</button>
+      <button class="tab" data-tab="plans">Plans</button>
       <button class="tab" data-tab="history">History</button>
       <button class="tab" data-tab="stats">Stats</button>
     </nav>
@@ -29,8 +30,14 @@
       <div id="no-session">
         <div id="start-options">
           <p class="hint">No active workout.</p>
-          <button id="start-workout-btn" class="btn-primary big">Start Workout</button>
-          <button id="log-past-btn" class="btn-secondary big">Log Past Workout</button>
+          <button id="start-workout-btn" class="btn-primary">Start Workout</button>
+          <button id="use-template-btn" class="btn-secondary">Use Template</button>
+          <button id="log-past-btn" class="btn-secondary log-past-small">Log Past Workout</button>
+        </div>
+        <div id="template-picker-step" class="hidden">
+          <p class="type-picker-label">Choose a template</p>
+          <div id="template-picker-list"></div>
+          <button id="template-picker-back-btn" class="btn-ghost">← Back</button>
         </div>
         <div id="type-picker" class="hidden">
           <p class="type-picker-label">What type of session?</p>
@@ -71,6 +78,14 @@
       </div>
     </section>
 
+    <!-- PLANS TAB -->
+    <section id="tab-plans" class="tab-content hidden">
+      <button id="new-template-btn" class="btn-primary" style="width:100%;margin-bottom:16px">+ New Template</button>
+      <div id="templates-list">
+        <p class="hint">No templates yet. Create one to pre-plan your workouts.</p>
+      </div>
+    </section>
+
     <!-- HISTORY TAB -->
     <section id="tab-history" class="tab-content hidden">
       <div id="history-list">
@@ -92,7 +107,6 @@
     <!-- STATS TAB -->
     <section id="tab-stats" class="tab-content hidden">
       <div id="streak-container"></div>
-
       <div class="stats-header">
         <label for="stats-exercise-select">Exercise</label>
         <select id="stats-exercise-select">
@@ -105,6 +119,29 @@
     </section>
   </div>
 
+  <!-- TEMPLATE EDITOR MODAL -->
+  <div id="template-modal-overlay" class="hidden">
+    <div id="template-modal">
+      <div class="edit-modal-header">
+        <h2 id="template-modal-title">New Template</h2>
+        <button id="template-modal-close-btn" class="btn-ghost">✕</button>
+      </div>
+      <div class="edit-section">
+        <label for="template-name-input">Template name</label>
+        <input id="template-name-input" type="text" placeholder="e.g. Push Day A" />
+      </div>
+      <div class="edit-section">
+        <label>Exercises</label>
+        <div id="template-exercise-list"></div>
+        <button id="template-add-exercise-btn" class="btn-secondary" style="width:100%;margin-top:8px">+ Add Exercise</button>
+      </div>
+      <div class="modal-actions">
+        <button id="template-cancel-btn" class="btn-secondary">Cancel</button>
+        <button id="template-save-btn" class="btn-primary">Save Template</button>
+      </div>
+    </div>
+  </div>
+
   <!-- EDIT WORKOUT MODAL -->
   <div id="edit-modal-overlay" class="hidden">
     <div id="edit-modal">
@@ -112,12 +149,10 @@
         <h2>Edit Workout</h2>
         <button id="edit-modal-close-btn" class="btn-ghost">✕</button>
       </div>
-
       <div class="edit-section">
         <label for="edit-date-input">Date</label>
         <input id="edit-date-input" type="date" />
       </div>
-
       <div class="edit-section">
         <label>Session type</label>
         <div class="type-chips edit-type-chips">
@@ -130,7 +165,6 @@
           <button class="type-chip edit-type-chip" data-type="Mobility">Mobility</button>
         </div>
       </div>
-
       <div class="edit-section">
         <label>Duration (optional)</label>
         <div class="duration-inputs">
@@ -138,13 +172,11 @@
           <input id="edit-mins-input" type="number" min="0" max="59" placeholder="0" /> <span>m</span>
         </div>
       </div>
-
       <div class="edit-section">
         <label>Exercises</label>
         <div id="edit-exercise-list"></div>
         <button id="edit-add-exercise-btn" class="btn-secondary" style="width:100%;margin-top:8px">+ Add Exercise</button>
       </div>
-
       <div class="modal-actions">
         <button id="edit-cancel-btn" class="btn-secondary">Cancel</button>
         <button id="edit-save-btn" class="btn-primary">Save Changes</button>
