@@ -43,6 +43,19 @@ header {
   padding: 24px 20px 14px;
 }
 
+.header-title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.app-version {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: .3px;
+}
+
 header h1 {
   font-size: 24px;
   font-weight: 800;
