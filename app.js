@@ -56,6 +56,22 @@ let timerInterval = null;
 // Active rest timers: "exIdx-setIdx" -> { intervalId, startedAt, displayEl, inputEl }
 const activeRestTimers = {};
 
+const REST_OPTIONS = [
+  { value: 15,  label: '15s'  },
+  { value: 20,  label: '20s'  },
+  { value: 30,  label: '30s'  },
+  { value: 45,  label: '45s'  },
+  { value: 60,  label: '1:00' },
+  { value: 75,  label: '1:15' },
+  { value: 90,  label: '1:30' },
+  { value: 105, label: '1:45' },
+  { value: 120, label: '2:00' },
+  { value: 150, label: '2:30' },
+  { value: 180, label: '3:00' },
+  { value: 240, label: '4:00' },
+  { value: 300, label: '5:00' },
+];
+
 // ── Tab switching ─────────────────────────────────────────────────────────────
 
 document.querySelectorAll('.tab').forEach(btn => {
@@ -265,6 +281,14 @@ function renderExerciseList() {
   });
 }
 
+function getLastSetsForExercise(name) {
+  for (const workout of workouts) {
+    const found = workout.exercises.find(e => e.name === name);
+    if (found && found.sets.length > 0) return found.sets;
+  }
+  return null;
+}
+
 function buildExerciseCard(ex, exIdx) {
   const card = document.createElement('div');
   card.className = 'exercise-card';
@@ -285,6 +309,27 @@ function buildExerciseCard(ex, exIdx) {
   header.appendChild(title);
   header.appendChild(removeBtn);
   card.appendChild(header);
+
+  const prevSets = getLastSetsForExercise(ex.name);
+  if (prevSets) {
+    const prevRow = document.createElement('div');
+    prevRow.className = 'prev-sets-row';
+    const label = document.createElement('span');
+    label.className = 'prev-sets-label';
+    label.textContent = 'Last';
+    const setsStr = prevSets.map(s => {
+      if (s.weight && s.reps) return `${s.weight}kg × ${s.reps}`;
+      if (s.reps) return `× ${s.reps}`;
+      if (s.weight) return `${s.weight}kg`;
+      return null;
+    }).filter(Boolean).join('  ·  ');
+    const text = document.createElement('span');
+    text.className = 'prev-sets-text';
+    text.textContent = setsStr;
+    prevRow.appendChild(label);
+    prevRow.appendChild(text);
+    card.appendChild(prevRow);
+  }
 
   // Sets table
   const table = document.createElement('table');
@@ -398,20 +443,30 @@ function buildSetRow(set, exIdx, setIdx) {
   restDisplay.className = 'rest-timer-display';
   restDisplay.textContent = set.rest ? formatRestTime(set.rest) : '';
 
-  const restInput = document.createElement('input');
+  const restInput = document.createElement('select');
   restInput.className = 'rest-input';
-  restInput.type = 'number';
-  restInput.min = '0';
-  restInput.placeholder = 'secs';
+  const blankOpt = document.createElement('option');
+  blankOpt.value = '';
+  blankOpt.textContent = 'Set rest';
+  restInput.appendChild(blankOpt);
+  REST_OPTIONS.forEach(({ value, label }) => {
+    const o = document.createElement('option');
+    o.value = value;
+    o.textContent = label;
+    restInput.appendChild(o);
+  });
+  if (set.rest && !REST_OPTIONS.find(o => o.value === set.rest)) {
+    const customOpt = document.createElement('option');
+    customOpt.value = set.rest;
+    customOpt.textContent = formatRestTime(set.rest);
+    restInput.insertBefore(customOpt, restInput.children[1]);
+  }
   restInput.value = set.rest || '';
 
-  const restUnit = document.createElement('span');
-  restUnit.className = 'rest-unit';
-  restUnit.textContent = 's';
-
   restInput.addEventListener('change', function () {
-    session.exercises[exIdx].sets[setIdx].rest = parseInt(this.value) || null;
-    restDisplay.textContent = this.value ? formatRestTime(parseInt(this.value)) : '';
+    const val = parseInt(this.value) || null;
+    session.exercises[exIdx].sets[setIdx].rest = val;
+    restDisplay.textContent = val ? formatRestTime(val) : '';
     saveSession(session);
     stopRestTimer(exIdx, setIdx);
   });
@@ -419,9 +474,14 @@ function buildSetRow(set, exIdx, setIdx) {
   timerBtn.addEventListener('click', () => {
     const key = `${exIdx}-${setIdx}`;
     if (activeRestTimers[key]) {
-      // Stop and save
       const elapsed = Math.floor((Date.now() - activeRestTimers[key].startedAt) / 1000);
       stopRestTimer(exIdx, setIdx);
+      if (!Array.from(restInput.options).find(o => parseInt(o.value) === elapsed)) {
+        const customOpt = document.createElement('option');
+        customOpt.value = elapsed;
+        customOpt.textContent = formatRestTime(elapsed);
+        restInput.insertBefore(customOpt, restInput.children[1]);
+      }
       restInput.value = elapsed;
       session.exercises[exIdx].sets[setIdx].rest = elapsed;
       restDisplay.textContent = formatRestTime(elapsed);
@@ -438,7 +498,6 @@ function buildSetRow(set, exIdx, setIdx) {
   restInner.appendChild(timerBtn);
   restInner.appendChild(restDisplay);
   restInner.appendChild(restInput);
-  restInner.appendChild(restUnit);
   restTd.appendChild(restInner);
   restRow.appendChild(restTd);
   fragment.appendChild(restRow);
@@ -713,9 +772,7 @@ document.getElementById('template-add-exercise-btn').addEventListener('click', (
 document.getElementById('template-save-btn').addEventListener('click', () => {
   const name = document.getElementById('template-name-input').value.trim();
   if (!name) { document.getElementById('template-name-input').focus(); return; }
-  const cleaned = templateEditExercises
-    .map(ex => ({ name: ex.name, sets: ex.sets.filter(s => s.reps || s.weight) }))
-    .filter(ex => ex.sets.length > 0);
+  const cleaned = templateEditExercises.filter(ex => ex.sets.length > 0);
   const t = { id: editingTemplateIdx !== null ? templates[editingTemplateIdx].id : Date.now(), name, exercises: cleaned };
   if (editingTemplateIdx !== null) templates[editingTemplateIdx] = t;
   else templates.push(t);

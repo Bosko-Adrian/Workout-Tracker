@@ -321,6 +321,32 @@ header h1 {
   font-weight: 600;
 }
 
+.prev-sets-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 16px 7px;
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+
+.prev-sets-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.prev-sets-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .sets-table {
   width: 100%;
   border-collapse: collapse;
@@ -418,19 +444,18 @@ header h1 {
 
 
 .rest-input {
-  width: 60px;
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text);
-  font-size: 14px;
-  padding: 4px 8px;
-  text-align: center;
+  font-size: 13px;
+  padding: 4px 6px;
   outline: none;
+  cursor: pointer;
+  max-width: 80px;
 }
 
 .rest-input:focus { border-color: var(--green); }
-.rest-unit { font-size: 12px; color: var(--text-muted); }
 
 .rest-timer-btn {
   padding: 5px 12px;
