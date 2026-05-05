@@ -53,6 +53,76 @@ let session = loadSession(); // { startedAt: ISO, manual?: bool, manualDate?: 'Y
 let templates = loadTemplates();
 let timerInterval = null;
 
+// ── Default program templates (seeded once if no templates exist) ─────────────
+
+const SEED_TEMPLATES = [
+  {
+    id: 1, name: 'Push A — Mon',
+    exercises: [
+      { name: 'Archer Push-Ups',           sets: [{ reps:'6',  weight:''   },{ reps:'6',  weight:''   },{ reps:'6',  weight:''   }] },
+      { name: 'Seated Overhead Press',     sets: [{ reps:'8',  weight:'9'  },{ reps:'8',  weight:'9'  },{ reps:'8',  weight:'9'  },{ reps:'8',  weight:'9'  }] },
+      { name: 'Dips',                      sets: [{ reps:'10', weight:''   },{ reps:'10', weight:''   },{ reps:'10', weight:''   }] },
+      { name: 'Lateral Raise',             sets: [{ reps:'15', weight:'9'  },{ reps:'15', weight:'9'  },{ reps:'15', weight:'9'  }] },
+      { name: 'Tricep Overhead Extension', sets: [{ reps:'12', weight:'7'  },{ reps:'12', weight:'7'  },{ reps:'12', weight:'7'  }] },
+    ]
+  },
+  {
+    id: 2, name: 'Pull A — Tue',
+    exercises: [
+      { name: 'Pull-Up',      sets: [{ reps:'6',  weight:''    },{ reps:'6',  weight:''    },{ reps:'5',  weight:''    },{ reps:'4',  weight:''    }] },
+      { name: 'Barbell Row',  sets: [{ reps:'8',  weight:'17'  },{ reps:'8',  weight:'17'  },{ reps:'8',  weight:'17'  },{ reps:'8',  weight:'17'  }] },
+      { name: 'Seated Curl',  sets: [{ reps:'10', weight:'9.5' },{ reps:'10', weight:'9.5' },{ reps:'10', weight:'9.5' }] },
+      { name: 'Hammer Curl',  sets: [{ reps:'12', weight:'7'   },{ reps:'12', weight:'7'   },{ reps:'12', weight:'7'   }] },
+      { name: 'Wrist Curls',  sets: [{ reps:'15', weight:''    },{ reps:'15', weight:''    }] },
+    ]
+  },
+  {
+    id: 3, name: 'Legs A — Wed',
+    exercises: [
+      { name: 'Goblet Squat',          sets: [{ reps:'10', weight:'8'  },{ reps:'10', weight:'8'  },{ reps:'10', weight:'8'  },{ reps:'10', weight:'8'  }] },
+      { name: 'Bulgarian Split Squat', sets: [{ reps:'10', weight:'8'  },{ reps:'10', weight:'8'  },{ reps:'10', weight:'8'  }] },
+      { name: 'Romanian Deadlift',     sets: [{ reps:'10', weight:'12' },{ reps:'10', weight:'12' },{ reps:'10', weight:'12' }] },
+      { name: 'Standing Calf Raise',   sets: [{ reps:'15', weight:''   },{ reps:'15', weight:''   },{ reps:'15', weight:''   },{ reps:'15', weight:''   }] },
+      { name: 'Hip Thrust',            sets: [{ reps:'12', weight:''   },{ reps:'12', weight:''   },{ reps:'12', weight:''   }] },
+    ]
+  },
+  {
+    id: 4, name: 'Push B — Fri',
+    exercises: [
+      { name: 'Pike Push-Ups',      sets: [{ reps:'10', weight:'' },{ reps:'10', weight:'' },{ reps:'10', weight:'' }] },
+      { name: 'Push-Ups',           sets: [{ reps:'15', weight:'' },{ reps:'15', weight:'' },{ reps:'15', weight:'' }] },
+      { name: 'Close-Grip Push-Up', sets: [{ reps:'12', weight:'' },{ reps:'12', weight:'' },{ reps:'12', weight:'' }] },
+      { name: 'Lateral Raise',      sets: [{ reps:'15', weight:'7'},{ reps:'15', weight:'7'},{ reps:'15', weight:'7'}] },
+      { name: 'Handstand Hold',     sets: [{ reps:'',   weight:'' },{ reps:'',   weight:'' },{ reps:'',   weight:'' }] },
+    ]
+  },
+  {
+    id: 5, name: 'Pull B — Sat',
+    exercises: [
+      { name: 'Pull-Up Negatives', sets: [{ reps:'5',  weight:''   },{ reps:'5',  weight:''   },{ reps:'5',  weight:''   }] },
+      { name: 'Barbell Row',       sets: [{ reps:'12', weight:'15' },{ reps:'12', weight:'15' },{ reps:'12', weight:'15' }] },
+      { name: 'Bicep Curl',        sets: [{ reps:'10', weight:'7'  },{ reps:'10', weight:'7'  },{ reps:'10', weight:'7'  },{ reps:'10', weight:'7'  }] },
+      { name: 'Incline Curl',      sets: [{ reps:'10', weight:'7'  },{ reps:'10', weight:'7'  },{ reps:'10', weight:'7'  }] },
+      { name: 'Wrist Curls',       sets: [{ reps:'15', weight:'11' },{ reps:'15', weight:'11' }] },
+    ]
+  },
+  {
+    id: 6, name: 'Legs B — Sun',
+    exercises: [
+      { name: 'Goblet Squat',      sets: [{ reps:'15', weight:'7'  },{ reps:'15', weight:'7'  },{ reps:'15', weight:'7'  }] },
+      { name: 'Sumo Squat',        sets: [{ reps:'12', weight:''   },{ reps:'12', weight:''   },{ reps:'12', weight:''   }] },
+      { name: 'Romanian Deadlift', sets: [{ reps:'12', weight:'12' },{ reps:'12', weight:'12' },{ reps:'12', weight:'12' }] },
+      { name: 'Reverse Lunge',     sets: [{ reps:'10', weight:''   },{ reps:'10', weight:''   },{ reps:'10', weight:''   }] },
+      { name: 'Calf Raise',        sets: [{ reps:'20', weight:''   },{ reps:'20', weight:''   },{ reps:'20', weight:''   }] },
+    ]
+  },
+];
+
+if (templates.length === 0) {
+  templates = SEED_TEMPLATES;
+  saveTemplates(templates);
+}
+
 // Active rest timers: "exIdx-setIdx" -> { intervalId, startedAt, displayEl, inputEl }
 const activeRestTimers = {};
 
@@ -541,14 +611,17 @@ function formatRestTime(secs) {
 
 const COMMON_EXERCISES = [
   'Bench Press','Incline Bench Press','Decline Bench Press',
-  'Squat','Front Squat','Leg Press','Leg Extension','Leg Curl',
+  'Squat','Front Squat','Goblet Squat','Sumo Squat','Leg Press','Leg Extension','Leg Curl',
   'Deadlift','Romanian Deadlift','Sumo Deadlift',
-  'Overhead Press','Lateral Raise','Front Raise','Arnold Press',
-  'Pull-Up','Chin-Up','Lat Pulldown','Seated Row','Barbell Row',
-  'Bicep Curl','Hammer Curl','Preacher Curl',
-  'Tricep Pushdown','Skull Crusher','Dips',
-  'Calf Raise','Hip Thrust','Cable Fly','Chest Fly',
-  'Face Pull','Shrugs','Plank','Crunch','Leg Raise'
+  'Overhead Press','Seated Overhead Press','Lateral Raise','Front Raise','Arnold Press',
+  'Pull-Up','Pull-Up Negatives','Chin-Up','Lat Pulldown','Seated Row','Barbell Row',
+  'Bicep Curl','Seated Curl','Incline Curl','Hammer Curl','Preacher Curl',
+  'Tricep Pushdown','Tricep Overhead Extension','Skull Crusher','Dips',
+  'Push-Ups','Archer Push-Ups','Pike Push-Ups','Close-Grip Push-Up','Handstand Hold',
+  'Bulgarian Split Squat','Reverse Lunge','Romanian Deadlift',
+  'Calf Raise','Standing Calf Raise','Hip Thrust','Glute Bridge',
+  'Cable Fly','Chest Fly','Face Pull','Shrugs','Plank','Crunch','Leg Raise',
+  'Wrist Curls','Reverse Wrist Curls'
 ];
 
 function populateSuggestions() {
