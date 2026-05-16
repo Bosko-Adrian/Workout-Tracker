@@ -388,10 +388,13 @@ function buildExerciseCard(ex, exIdx) {
     label.className = 'prev-sets-label';
     label.textContent = 'Last';
     const setsStr = prevSets.map(s => {
-      if (s.weight && s.reps) return `${s.weight}kg × ${s.reps}`;
-      if (s.reps) return `× ${s.reps}`;
-      if (s.weight) return `${s.weight}kg`;
-      return null;
+      let str = '';
+      if (s.weight && s.reps) str = `${s.weight}kg × ${s.reps}`;
+      else if (s.reps) str = `× ${s.reps}`;
+      else if (s.weight) str = `${s.weight}kg`;
+      else return null;
+      if (s.negatives) str += ` +${s.negatives}neg`;
+      return str;
     }).filter(Boolean).join('  ·  ');
     const text = document.createElement('span');
     text.className = 'prev-sets-text';
@@ -484,13 +487,64 @@ function buildSetRow(set, exIdx, setIdx) {
     saveSession(session);
     checkBtn.classList.toggle('checked', nowDone);
     tr.classList.toggle('checked', nowDone);
+    negRow.classList.toggle('hidden', !nowDone);
     restRow.classList.toggle('hidden', !nowDone);
-    // Stop timer if unchecking
     if (!nowDone) stopRestTimer(exIdx, setIdx);
   });
   doneTd.appendChild(checkBtn);
   tr.appendChild(doneTd);
   fragment.appendChild(tr);
+
+  // ── Negatives row (shown after set is checked off) ────────────────────────
+  const negRow = document.createElement('tr');
+  negRow.className = 'neg-row' + (set.done ? '' : ' hidden');
+  const negTd = document.createElement('td');
+  negTd.colSpan = 4;
+  const negInner = document.createElement('div');
+  negInner.className = 'neg-row-inner';
+
+  const negLabel = document.createElement('span');
+  negLabel.className = 'neg-label';
+  negLabel.textContent = 'Negatives';
+
+  const negMinus = document.createElement('button');
+  negMinus.className = 'neg-btn';
+  negMinus.setAttribute('aria-label', 'Remove negative rep');
+  negMinus.textContent = '−';
+
+  const negCount = document.createElement('span');
+  negCount.className = 'neg-count';
+  negCount.textContent = set.negatives || 0;
+
+  const negPlus = document.createElement('button');
+  negPlus.className = 'neg-btn';
+  negPlus.setAttribute('aria-label', 'Add negative rep');
+  negPlus.textContent = '+';
+
+  negMinus.addEventListener('click', () => {
+    const cur = session.exercises[exIdx].sets[setIdx].negatives || 0;
+    if (cur === 0) return;
+    const next = cur - 1;
+    session.exercises[exIdx].sets[setIdx].negatives = next || null;
+    negCount.textContent = next;
+    saveSession(session);
+  });
+
+  negPlus.addEventListener('click', () => {
+    const cur = session.exercises[exIdx].sets[setIdx].negatives || 0;
+    const next = cur + 1;
+    session.exercises[exIdx].sets[setIdx].negatives = next;
+    negCount.textContent = next;
+    saveSession(session);
+  });
+
+  negInner.appendChild(negLabel);
+  negInner.appendChild(negMinus);
+  negInner.appendChild(negCount);
+  negInner.appendChild(negPlus);
+  negTd.appendChild(negInner);
+  negRow.appendChild(negTd);
+  fragment.appendChild(negRow);
 
   // ── Rest row (shown after set is checked off) ──
   const restRow = document.createElement('tr');
@@ -917,7 +971,8 @@ function buildHistoryItem(workout, idx) {
     ex.sets.forEach((s, i) => {
       const row = document.createElement('div');
       row.className = 'history-set-row';
-      row.innerHTML = `<span class="num">Set ${i+1}</span>${s.weight ? s.weight + ' kg' : '—'} &times; ${s.reps || '—'} reps`;
+      const negsText = s.negatives ? ` <span class="history-neg-badge">+${s.negatives} neg</span>` : '';
+      row.innerHTML = `<span class="num">Set ${i+1}</span>${s.weight ? s.weight + ' kg' : '—'} &times; ${s.reps || '—'} reps${negsText}`;
       setsDiv.appendChild(row);
       if (s.rest && i < ex.sets.length - 1) {
         const restRow = document.createElement('div');

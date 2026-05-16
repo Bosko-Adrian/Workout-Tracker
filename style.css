@@ -470,6 +470,62 @@ header h1 {
 
 .rest-input:focus { border-color: var(--green); }
 
+/* ── Negatives row ── */
+.neg-row td { padding: 0 12px 6px; }
+
+.neg-row-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border-radius: 8px;
+  padding: 5px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.neg-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--accent);
+  flex: 1;
+}
+
+.neg-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s;
+}
+
+.neg-btn:hover { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+
+.neg-count {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 24px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-neg-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-left: 4px;
+}
+
 .rest-timer-btn {
   padding: 5px 12px;
   border-radius: 20px;
